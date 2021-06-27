@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Quill from "quill";
 import QuillCursors from "quill-cursors";
+import ImageResize from "quill-image-resize-module-react";
 import { useParams } from "react-router";
 import { io } from "socket.io-client";
 import "quill/dist/quill.snow.css";
@@ -29,6 +30,7 @@ Size.whitelist = [
 ];
 Quill.register(Size, true);
 Quill.register("modules/cursors", QuillCursors);
+Quill.register("modules/imageResize", ImageResize);
 
 const TOOLBAR_OPTIONS = [
   [{ header: [1, 2, 3, 4, 5, 6, false] }],
@@ -62,6 +64,9 @@ const TextEditor = () => {
       modules: {
         toolbar: TOOLBAR_OPTIONS,
         cursors: true,
+        imageResize: {
+          parchment: Quill.import("parchment"),
+        },
       },
     });
     q.disable();
