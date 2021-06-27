@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useState } from "react";
 import Quill from "quill";
+import QuillCursors from "quill-cursors";
 import { useParams } from "react-router";
 import { io } from "socket.io-client";
 import "quill/dist/quill.snow.css";
+import { v4 as uuidv4 } from "uuid";
 
 const Size = Quill.import("attributors/style/size");
 Size.whitelist = [
@@ -26,6 +28,7 @@ Size.whitelist = [
   "96px",
 ];
 Quill.register(Size, true);
+Quill.register("modules/cursors", QuillCursors);
 
 const TOOLBAR_OPTIONS = [
   [{ header: [1, 2, 3, 4, 5, 6, false] }],
@@ -43,6 +46,9 @@ const TOOLBAR_OPTIONS = [
 const TextEditor = () => {
   const [socket, setSocket] = useState();
   const [quill, setQuill] = useState();
+  const [uid, setUid] = useState(uuidv4());
+  const [name, setName] = useState("");
+  const [cursors, setCursor] = useState(null);
   const { id: docId } = useParams();
 
   const editorRef = useCallback((wrapper) => {
@@ -55,10 +61,13 @@ const TextEditor = () => {
       theme: "snow",
       modules: {
         toolbar: TOOLBAR_OPTIONS,
+        cursors: true,
       },
     });
     q.disable();
     q.setText("Loading...");
+    setCursor(q.getModule("cursors"));
+
     setQuill(q);
   }, []);
 
@@ -66,6 +75,7 @@ const TextEditor = () => {
   useEffect(() => {
     const s = io("http://localhost:3001");
     setSocket(s);
+    setName(prompt("Please enter name"));
     return () => {
       s.disconnect();
     };
@@ -101,10 +111,20 @@ const TextEditor = () => {
       if (source !== "user") return;
       socket.emit("send-changes", delta);
     };
+    const cursorHandler = (range, oldRange, source) => {
+      socket.emit("update-cursor", {
+        userId: uid,
+        userName: name,
+        range,
+        color: "red",
+      });
+    };
     quill.on("text-change", handler);
+    quill.on("selection-change", cursorHandler);
 
     return () => {
       quill.off("text-change", handler);
+      quill.off("selection-change", cursorHandler);
     };
   }, [quill, socket]);
 
@@ -114,10 +134,27 @@ const TextEditor = () => {
     const handler = (delta) => {
       quill.updateContents(delta);
     };
-    socket.on("receive-changes", handler);
 
+    const cursorHandler = ({ userId, userName, range, color }) => {
+      if (range) {
+        cursors.createCursor(userId, userName, color);
+        cursors.moveCursor(userId, range);
+        cursors.toggleFlag(userId, true);
+      } else {
+        console.log(userId);
+        cursors.removeCursor(userId);
+      }
+    };
+
+    socket.on("receive-changes", handler);
+    socket.on("receive-cursor", cursorHandler);
     return () => {
       socket.off("receive-changes", handler);
+      socket.off("receive-cursor", cursorHandler);
+      socket.emit("update-cursor", {
+        userId: uid,
+        range: null,
+      });
     };
   }, [quill, socket]);
 

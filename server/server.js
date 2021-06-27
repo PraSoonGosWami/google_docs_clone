@@ -28,6 +28,9 @@ io.on("connection", (socket) => {
     socket.on("send-changes", (delta) => {
       socket.broadcast.to(docId).emit("receive-changes", delta);
     });
+    socket.on("update-cursor", (cursorData) => {
+      socket.broadcast.to(docId).emit("receive-cursor", cursorData);
+    });
     socket.on("save-document", async (data) => {
       await Document.findByIdAndUpdate(docId, { data });
     });
